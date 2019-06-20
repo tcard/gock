@@ -3,12 +3,14 @@
 Package gock (a portmanteau of the `go` statement and "block") provides [structured concurrency](https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/) utilities for Go.
 
 ```go
+ctx, cancel := context.WithCancel(ctx)
 things := make(chan Thing)
 
 err := gock.Wait(func() error {
 	defer close(things)
 	return Produce(ctx, things)
 }, func() error {
+	defer cancel()
 	return Consume(things)
 })
 
