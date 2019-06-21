@@ -24,22 +24,3 @@ func (errs ConcurrentErrors) AnyAs(target interface{}) bool {
 	}
 	return false
 }
-
-// Unwrap returns, if it exists, the common ancestor among the error chains of
-// all errors contained in the ConcurrentErrors.
-func (errs ConcurrentErrors) Unwrap() error {
-	timesFound := map[error]int{}
-	chain := errs.Errors
-	for i := 0; i < len(chain); i++ {
-		err := chain[i]
-		timesFound[err]++
-		if timesFound[err] == len(errs.Errors) {
-			return err
-		}
-		next := errors.Unwrap(err)
-		if next != nil {
-			chain = append(chain, err)
-		}
-	}
-	return nil
-}
