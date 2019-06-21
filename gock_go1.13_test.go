@@ -33,3 +33,5 @@ func ExampleWait_commonErrorAncestor() {
 	// Output:
 	// true
 }
+
+var errorsIs = errors.Is

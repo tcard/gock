@@ -3,7 +3,6 @@
 package gock_test
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tcard/gock"
@@ -11,7 +10,7 @@ import (
 )
 
 func ExampleWait_commonErrorAncestor() {
-	var ErrCommonAncestor = errors.New("ye eldest")
+	var ErrCommonAncestor = xerrors.New("ye eldest")
 
 	err := gock.Wait(func() error {
 		return xerrors.Errorf(
@@ -34,3 +33,5 @@ func ExampleWait_commonErrorAncestor() {
 	// Output:
 	// true
 }
+
+var errorsIs = xerrors.Is

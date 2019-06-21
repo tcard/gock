@@ -137,7 +137,7 @@ func (errs ConcurrentErrors) Unwrap() error {
 		}
 		next := unwrap(err)
 		if next != nil {
-			chain = append(chain, err)
+			chain = append(chain, next)
 		}
 	}
 	return nil

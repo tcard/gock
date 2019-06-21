@@ -62,3 +62,15 @@ func TestGoRunsBeforeWait(t *testing.T) {
 	g(func() error { close(done); return nil })
 	<-done
 }
+
+func TestConcurrentErrorsUnwrapNoCommonAncestor(t *testing.T) {
+	ancestor := errors.New("ancestor")
+	err := gock.AddConcurrentError(
+		chain{errors.New("foo"), ancestor},
+		chain{errors.New("baz"), errors.New("another ancestor")},
+	)
+	ok := errorsIs(err, ancestor)
+	if ok {
+		t.Errorf("didn't expect to find the non-common ancestor")
+	}
+}
