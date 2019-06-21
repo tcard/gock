@@ -31,9 +31,8 @@ func ExampleWait_concurrentErrors() {
 		return ErrOops
 	})
 
-	errs := err.(gock.ConcurrentErrors)
-	fmt.Println(errs.AnyIs(ErrOops))
-	fmt.Println(errs.AnyIs(ErrFailed))
+	fmt.Println(gock.AnyIs(err, ErrOops))
+	fmt.Println(gock.AnyIs(err, ErrFailed))
 	// Output:
 	// true
 	// true
