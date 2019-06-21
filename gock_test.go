@@ -244,3 +244,14 @@ func TestConcurrentErrorsUnwrapNoCommonAncestor(t *testing.T) {
 		t.Errorf("didn't expect to find the non-common ancestor")
 	}
 }
+
+func TestWaitRunsCallHereBeforeWait(t *testing.T) {
+	calledHere := make(chan struct{})
+	gock.Wait(func() error {
+		close(calledHere)
+		return nil
+	}, func() error {
+		<-calledHere
+		return nil
+	})
+}

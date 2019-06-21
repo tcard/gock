@@ -69,7 +69,7 @@ func Wait(fs ...func() error) error {
 			g(f)
 		}
 	}
-	return AddConcurrentError(wait(), callHere())
+	return AddConcurrentError(callHere(), wait())
 }
 
 // AddConcurrentError merges two concurrent, possibly nil errors.
