@@ -3,6 +3,7 @@ package gock_test
 import (
 	"errors"
 	"fmt"
+	"testing"
 
 	"github.com/tcard/gock"
 )
@@ -52,4 +53,12 @@ func ExampleWait_sameErrorTwice() {
 	fmt.Println(err == ErrOops)
 	// Output:
 	// true
+}
+
+func TestGoRunsBeforeWait(t *testing.T) {
+	g, wait := gock.Bundle()
+	defer wait()
+	done := make(chan struct{})
+	g(func() error { close(done); return nil })
+	<-done
 }

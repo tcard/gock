@@ -22,13 +22,18 @@ import (
 func Bundle() (g func(func() error), wait func() error) {
 	waited := false
 	var err error
-	var fs []func() error
+
+	errs := make(chan error)
+	callCount := 0
 
 	g = func(f func() error) {
 		if waited {
 			panic("gock: bundle already finished")
 		}
-		fs = append(fs, f)
+		go func() {
+			errs <- f()
+		}()
+		callCount++
 	}
 
 	wait = func() error {
@@ -37,23 +42,7 @@ func Bundle() (g func(func() error), wait func() error) {
 		}
 		waited = true
 
-		errs := make(chan error, len(fs)-1)
-		var callHere func() error
-		for i, f := range fs {
-			f := f
-			if i == 0 {
-				// Save a goroutine by running it in this one.
-				callHere = f
-			} else {
-				go func() {
-					errs <- f()
-				}()
-			}
-		}
-		if callHere != nil {
-			err = callHere()
-		}
-		for i := 0; i < len(fs)-1; i++ {
+		for i := 0; i < callCount; i++ {
 			err = AddConcurrentError(err, <-errs)
 		}
 		return err
@@ -62,6 +51,8 @@ func Bundle() (g func(func() error), wait func() error) {
 	return g, wait
 }
 
+var nopFunc = func() error { return nil }
+
 // Wait runs the provided functions concurrently. It waits for all of them to
 // return before returning itself.
 //
@@ -69,10 +60,16 @@ func Bundle() (g func(func() error), wait func() error) {
 // returned by the function.
 func Wait(fs ...func() error) error {
 	g, wait := Bundle()
-	for _, f := range fs {
-		g(f)
+	callHere := nopFunc
+	for i, f := range fs {
+		if i == 0 {
+			// Save a goroutine by running it in this one.
+			callHere = f
+		} else {
+			g(f)
+		}
 	}
-	return wait()
+	return AddConcurrentError(wait(), callHere())
 }
 
 // AddConcurrentError merges two concurrent, possibly nil errors.
