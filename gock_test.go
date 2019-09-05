@@ -3,6 +3,7 @@ package gock_test
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/tcard/gock"
@@ -254,4 +255,25 @@ func TestWaitRunsCallHereBeforeWait(t *testing.T) {
 		<-calledHere
 		return nil
 	})
+}
+
+func TestAddConcurrentUncomparableErrors(t *testing.T) {
+	// https://github.com/tcard/gock/issues/1
+	var allErrors []error
+	for i := 0; i < 4; i++ {
+		allErrors = append(allErrors, fmt.Errorf("error %d", i))
+	}
+	err := gock.AddConcurrentError(
+		gock.AddConcurrentError(
+			allErrors[0],
+			allErrors[1],
+		),
+		gock.AddConcurrentError(
+			allErrors[2],
+			allErrors[3],
+		),
+	)
+	if expected, got := allErrors, err.(gock.ConcurrentErrors).Errors; !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected %#v, got %#v", expected, got)
+	}
 }

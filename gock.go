@@ -2,6 +2,7 @@ package gock
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -86,10 +87,12 @@ func Wait(fs ...func() error) error {
 // ie. it incorporates the errors contained in the merged ConcurrentErrors, not
 // the ConcurrentErrors themselves.
 func AddConcurrentError(to error, err error) error {
-	if err == nil || err == to {
+	if err == nil {
 		return to
 	} else if to == nil {
 		return err
+	} else if reflect.TypeOf(to).Comparable() && to == err {
+		return to
 	} else {
 		var merged ConcurrentErrors
 		for _, err := range []error{to, err} {
