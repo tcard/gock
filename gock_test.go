@@ -277,3 +277,54 @@ func TestAddConcurrentUncomparableErrors(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expected, got)
 	}
 }
+
+func TestPanic(t *testing.T) {
+	expectedErr := errors.New("expected")
+
+	for _, c := range []struct {
+		name string
+		do   func()
+	}{{
+		"first goroutine on Wait",
+		func() {
+			gock.Wait(func() error {
+				panic(expectedErr)
+			}, func() error {
+				return nil
+			})
+		},
+	}, {
+		"non-first goroutine on Wait",
+		func() {
+			gock.Wait(func() error {
+				return nil
+			}, func() error {
+				panic(expectedErr)
+			})
+		},
+	}, {
+		"on Bundle",
+		func() {
+			g, wait := gock.Bundle()
+			g(func() error {
+				panic(expectedErr)
+			})
+			g(func() error {
+				return nil
+			})
+			wait()
+		},
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				err, ok := r.(error)
+				if !ok || !errorsIs(err, expectedErr) {
+					t.Errorf("expected repanic of expectedErr in the blocked goroutine, got: %v", r)
+				}
+			}()
+
+			c.do()
+		})
+	}
+}

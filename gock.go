@@ -3,6 +3,7 @@ package gock
 import (
 	"fmt"
 	"reflect"
+	"runtime/debug"
 	"strings"
 )
 
@@ -19,12 +20,17 @@ import (
 // Once wait is called, calling g again panics. Calling wait more than once
 // just returns the same result.
 //
+// If any of the functions panics in another goroutine, the recovered value is
+// repanicked in the goroutine that calls wait, wrapped in an error type that
+// keeps the original stack trace where the panic happened and that has the
+// method Unwrap() error to recover the original value, if it was an error.
+//
 // You may prefer Wait, which is a shortcut.
 func Bundle() (g func(func() error), wait func() error) {
 	waited := false
-	var err error
 
 	errs := make(chan error)
+	panics := make(chan capturedPanic)
 	callCount := 0
 
 	g = func(f func() error) {
@@ -32,24 +38,53 @@ func Bundle() (g func(func() error), wait func() error) {
 			panic("gock: bundle already finished")
 		}
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panics <- capturedPanic{r, debug.Stack()}
+				}
+			}()
 			errs <- f()
 		}()
 		callCount++
 	}
 
+	var waitErr error
 	wait = func() error {
 		if waited {
-			return err
+			return waitErr
 		}
 		waited = true
 
 		for i := 0; i < callCount; i++ {
-			err = AddConcurrentError(err, <-errs)
+			select {
+			case p := <-panics:
+				panic(p)
+			case err := <-errs:
+				waitErr = AddConcurrentError(waitErr, err)
+			}
 		}
-		return err
+		return waitErr
 	}
 
 	return g, wait
+}
+
+type capturedPanic struct {
+	p     interface{}
+	stack []byte
+}
+
+func (p capturedPanic) Error() string {
+	return fmt.Sprintf("gock: managed goroutine panicked: %v\n\noriginal stack:\n\n%s", p.p, p.stack)
+}
+
+func (p capturedPanic) Unwrap() error {
+	switch err := p.p.(type) {
+	case error:
+		return err
+	default:
+		return nil
+	}
 }
 
 var nopFunc = func() error { return nil }
@@ -59,6 +94,11 @@ var nopFunc = func() error { return nil }
 //
 // It returns the result of repeatedly calling AddConcurrentError on each error
 // returned by the function.
+//
+// If any of the functions panics in another goroutine, the recovered value is
+// repanicked in the goroutine that calls Wait, wrapped in an error type that
+// keeps the original stack trace where the panic happened and that has the
+// method Unwrap() error to recover the original value, if it was an error.
 func Wait(fs ...func() error) error {
 	g, wait := Bundle()
 	callHere := nopFunc
