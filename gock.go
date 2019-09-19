@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+// A GoFunc runs a given function concurrently.
+type GoFunc func(func() error)
+
+// NoErr makes the GoFunc run a function that doesn't return an error.
+func (g GoFunc) NoErr(f func()) {
+	g(func() error {
+		f()
+		return nil
+	})
+}
+
 // Bundle returns a function g to run functions concurrently, and a
 // function wait to wait for all the functions provided to g to return before
 // returning itself. Thus, the provided functions run in a "bundle" of
@@ -26,7 +37,7 @@ import (
 // method Unwrap() error to recover the original value, if it was an error.
 //
 // You may prefer Wait, which is a shortcut.
-func Bundle() (g func(func() error), wait func() error) {
+func Bundle() (g GoFunc, wait func() error) {
 	waited := false
 
 	errs := make(chan error)

@@ -328,3 +328,21 @@ func TestPanic(t *testing.T) {
 		})
 	}
 }
+
+func TestNoErr(t *testing.T) {
+	g, wait := gock.Bundle()
+
+	called := false
+	g.NoErr(func() {
+		called = true
+	})
+
+	err := wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if !called {
+		t.Errorf("expected concurrent function to be called")
+	}
+}
