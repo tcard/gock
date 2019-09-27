@@ -346,3 +346,51 @@ func TestNoErr(t *testing.T) {
 		t.Errorf("expected concurrent function to be called")
 	}
 }
+
+func TestUnwrapDeepConcurrentErrors(t *testing.T) {
+	err := gock.AddConcurrentError(
+		fmt.Errorf("wrapping to avoid flattening: %w", gock.AddConcurrentError(
+			errors.New("A"),
+			errors.New("B"),
+		)),
+		errors.New("C"),
+	)
+	if got := err.(gock.ConcurrentErrors).Unwrap(); got != nil {
+		t.Errorf("didn't expect unwrapped error, got: %v", got)
+	}
+}
+
+func TestUnwrapUnhashableCommonAncestor(t *testing.T) {
+	unhashableErr := unhashableError{errors.New("hi"), nil}
+	err := gock.AddConcurrentError(
+		fmt.Errorf("wrapping: %w", unhashableErr),
+		unhashableErr,
+	)
+	if got := err.(gock.ConcurrentErrors).Unwrap(); got != nil {
+		t.Errorf("didn't expect unwrapped error, got: %v", got)
+	}
+}
+
+func TestIsUnhashableCommonAncestor(t *testing.T) {
+	unhashableErr := unhashableError{errors.New("hi"), nil}
+	err := gock.AddConcurrentError(
+		fmt.Errorf("wrapping: %w", unhashableErr),
+		unhashableErr,
+	)
+	if !errorsIs(err, unhashableErr) {
+		t.Errorf("expected unhashable common ancestor to be found")
+	}
+}
+
+type unhashableError struct {
+	error
+	s []int
+}
+
+func (uerr unhashableError) Is(err error) bool {
+	switch err := err.(type) {
+	case unhashableError:
+		return errorsIs(err.error, uerr.error) && reflect.DeepEqual(err.s, uerr.s)
+	}
+	return false
+}

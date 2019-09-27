@@ -1,6 +1,7 @@
 package gock
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -179,6 +180,18 @@ func (errs ConcurrentErrors) Unwrap() error {
 	chain := errs.Errors
 	for i := 0; i < len(chain); i++ {
 		err := chain[i]
+
+		if !reflect.TypeOf(err).Comparable() {
+			if subErrs, ok := err.(ConcurrentErrors); ok {
+				chain = append(chain, subErrs.Errors...)
+				continue
+			} else {
+				// Some of the errors in the chains aren't comparable, so
+				// there's no sense of "common" for them. We've done our best.
+				return nil
+			}
+		}
+
 		timesFound[err]++
 		if timesFound[err] == len(errs.Errors) {
 			return err
@@ -189,6 +202,17 @@ func (errs ConcurrentErrors) Unwrap() error {
 		}
 	}
 	return nil
+}
+
+// Is returns true if errors.Is(subError, err) returns true for all errors
+// inside the ConcurrentErrors.
+func (errs ConcurrentErrors) Is(err error) bool {
+	for _, cerr := range errs.Errors {
+		if !errors.Is(cerr, err) {
+			return false
+		}
+	}
+	return true
 }
 
 func unwrap(err error) error {
