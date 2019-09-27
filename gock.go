@@ -112,16 +112,10 @@ var nopFunc = func() error { return nil }
 // method Unwrap() error to recover the original value, if it was an error.
 func Wait(fs ...func() error) error {
 	g, wait := Bundle()
-	callHere := nopFunc
-	for i, f := range fs {
-		if i == 0 {
-			// Save a goroutine by running it in this one.
-			callHere = f
-		} else {
-			g(f)
-		}
+	for _, f := range fs {
+		g(f)
 	}
-	return AddConcurrentError(callHere(), wait())
+	return wait()
 }
 
 // AddConcurrentError merges two concurrent, possibly nil errors.

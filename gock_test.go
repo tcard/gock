@@ -290,14 +290,14 @@ func TestPanic(t *testing.T) {
 			gock.Wait(func() error {
 				panic(expectedErr)
 			}, func() error {
-				return nil
+				select {}
 			})
 		},
 	}, {
 		"non-first goroutine on Wait",
 		func() {
 			gock.Wait(func() error {
-				return nil
+				select {}
 			}, func() error {
 				panic(expectedErr)
 			})
@@ -310,7 +310,7 @@ func TestPanic(t *testing.T) {
 				panic(expectedErr)
 			})
 			g(func() error {
-				return nil
+				select {}
 			})
 			wait()
 		},
