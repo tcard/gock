@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/tcard/gock"
 )
@@ -74,6 +75,34 @@ func TestGoAfterWait(t *testing.T) {
 		g(func() error { return nil })
 		t.Error("expected panic")
 	}()
+}
+
+func TestGoWhileWaiting(t *testing.T) {
+	doneGo := make(chan struct{}, 2)
+
+	g, wait := gock.Bundle()
+
+	g(func() error {
+		time.Sleep(100 * time.Millisecond) // Give time for wait() to start.
+		g(func() error {
+			doneGo <- struct{}{}
+			return nil
+		})
+		doneGo <- struct{}{}
+		return nil
+	})
+
+	err := wait()
+	for i := 0; i < cap(doneGo); i++ {
+		select {
+		case <-doneGo:
+		default:
+			t.Errorf("goroutines should've finished by now")
+		}
+	}
+	if err != nil {
+		t.Errorf("got unexpected error: %s", err)
+	}
 }
 
 func TestIdempotentWait(t *testing.T) {

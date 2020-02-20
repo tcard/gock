@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"sync"
 )
 
 // A GoFunc runs a given function concurrently.
@@ -27,9 +28,9 @@ func (g GoFunc) NoErr(f func()) {
 // wait returns the result of repeatedly calling AddConcurrentError on each
 // error returned by the function.
 //
-// It's not safe to call g or wait concurrently from different goroutines.
+// It is safe to call g or wait concurrently from different goroutines.
 //
-// Once wait is called, calling g again panics. Calling wait more than once
+// Once wait returns, calling g again panics. Calling wait more than once
 // just returns the same result.
 //
 // If any of the functions panics in another goroutine, the recovered value is
@@ -39,16 +40,25 @@ func (g GoFunc) NoErr(f func()) {
 //
 // You may prefer Wait, which is a shortcut.
 func Bundle() (g GoFunc, wait func() error) {
-	waited := false
-
 	errs := make(chan error)
 	panics := make(chan capturedPanic)
-	callCount := 0
+
+	var (
+		mtx       sync.Mutex
+		callCount int64
+		waited    bool
+	)
 
 	g = func(f func() error) {
+		mtx.Lock()
+		defer mtx.Unlock()
+
 		if waited {
 			panic("gock: bundle already finished")
 		}
+
+		callCount++
+
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -57,17 +67,25 @@ func Bundle() (g GoFunc, wait func() error) {
 			}()
 			errs <- f()
 		}()
-		callCount++
 	}
 
 	var waitErr error
 	wait = func() error {
-		if waited {
-			return waitErr
-		}
-		waited = true
+		for {
+			mtx.Lock()
+			if waited {
+				return waitErr
+			}
+			if callCount == 0 {
+				waited = true
+				mtx.Unlock()
+				return waitErr
+			}
 
-		for i := 0; i < callCount; i++ {
+			callCount--
+			mtx.Unlock()
+
+			// Wait for the result of the goroutine we just "acknowledged".
 			select {
 			case p := <-panics:
 				panic(p)
@@ -75,7 +93,6 @@ func Bundle() (g GoFunc, wait func() error) {
 				waitErr = AddConcurrentError(waitErr, err)
 			}
 		}
-		return waitErr
 	}
 
 	return g, wait
