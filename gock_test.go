@@ -57,6 +57,31 @@ func ExampleWait_sameErrorTwice() {
 	// true
 }
 
+func ExampleWait_commonErrorAncestor() {
+	var ErrCommonAncestor = errors.New("ye eldest")
+
+	err := gock.Wait(func() error {
+		return fmt.Errorf(
+			"first in first chain: %w",
+			fmt.Errorf(
+				"second in first chain: %w",
+				ErrCommonAncestor,
+			),
+		)
+	}, func() error {
+		return nil
+	}, func() error {
+		return fmt.Errorf(
+			"first in second chain: %w",
+			ErrCommonAncestor,
+		)
+	})
+
+	fmt.Println(errors.Is(err, ErrCommonAncestor))
+	// Output:
+	// true
+}
+
 func TestGoRunsBeforeWait(t *testing.T) {
 	g, wait := gock.Bundle()
 	defer wait()
@@ -269,7 +294,7 @@ func TestConcurrentErrorsUnwrapNoCommonAncestor(t *testing.T) {
 		chain{errors.New("foo"), ancestor},
 		chain{errors.New("baz"), errors.New("another ancestor")},
 	)
-	ok := errorsIs(err, ancestor)
+	ok := errors.Is(err, ancestor)
 	if ok {
 		t.Errorf("didn't expect to find the non-common ancestor")
 	}
@@ -348,7 +373,7 @@ func TestPanic(t *testing.T) {
 			defer func() {
 				r := recover()
 				err, ok := r.(error)
-				if !ok || !errorsIs(err, expectedErr) {
+				if !ok || !errors.Is(err, expectedErr) {
 					t.Errorf("expected repanic of expectedErr in the blocked goroutine, got: %v", r)
 				}
 			}()
@@ -406,7 +431,7 @@ func TestIsUnhashableCommonAncestor(t *testing.T) {
 		fmt.Errorf("wrapping: %w", unhashableErr),
 		unhashableErr,
 	)
-	if !errorsIs(err, unhashableErr) {
+	if !errors.Is(err, unhashableErr) {
 		t.Errorf("expected unhashable common ancestor to be found")
 	}
 }
@@ -419,7 +444,7 @@ type unhashableError struct {
 func (uerr unhashableError) Is(err error) bool {
 	switch err := err.(type) {
 	case unhashableError:
-		return errorsIs(err.error, uerr.error) && reflect.DeepEqual(err.s, uerr.s)
+		return errors.Is(err.error, uerr.error) && reflect.DeepEqual(err.s, uerr.s)
 	}
 	return false
 }
