@@ -436,6 +436,19 @@ func TestIsUnhashableCommonAncestor(t *testing.T) {
 	}
 }
 
+func TestUnhashableButComparableErrorNoPanic(t *testing.T) {
+	unhashableErr := comparableError{unhashableError{errors.New("hi"), nil}}
+	err := gock.AddConcurrentError(
+		fmt.Errorf("wrapping: %w", unhashableErr),
+		unhashableErr,
+	)
+	errors.Unwrap(err)
+}
+
+type comparableError struct {
+	error
+}
+
 type unhashableError struct {
 	error
 	s []int

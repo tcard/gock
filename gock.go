@@ -198,7 +198,7 @@ func (errs ConcurrentErrors) Unwrap() error {
 	for i := 0; i < len(chain); i++ {
 		err := chain[i]
 
-		if !reflect.TypeOf(err).Comparable() {
+		if !isHashable(err) {
 			if subErrs, ok := err.(ConcurrentErrors); ok {
 				chain = append(chain, subErrs.Errors...)
 				continue
@@ -273,4 +273,14 @@ func unwrap(err error) error {
 	default:
 		return nil
 	}
+}
+
+var emptyAnyMap map[interface{}]struct{}
+
+func isHashable(v interface{}) bool {
+	defer func() {
+		recover()
+	}()
+	_ = emptyAnyMap[v]
+	return true
 }
